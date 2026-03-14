@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Shooter - Boy Version 🤎</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600&family=Playfair+Display:italic,wght@600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans Thai', sans-serif; background-color: #FDFBF7; overflow: hidden; touch-action: manipulation; }
+        .serif { font-family: 'Playfair Display', serif; }
+        #target { position: absolute; width: 95px; height: 95px; cursor: pointer; z-index: 10; transition: transform 0.1s; }
+        #target:active { transform: scale(0.9); }
+        .heart-particle { position: absolute; pointer-events: none; animation: floatUp 0.8s ease-out forwards; z-index: 5; }
+        
+        /* Animation สำหรับระเบิดหัวใจรางวัล */
+        .reward-heart { position: absolute; pointer-events: none; animation: explode 1.5s ease-out forwards; z-index: 50; }
+        @keyframes explode {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-120px) scale(2); opacity: 0; } }
+        .reward-item { transition: all 0.5s ease; border-left: 4px solid #E7DCD3; margin-bottom: 0.75rem; }
+        .reward-unlocked { border-left: 4px solid #6F4E37; background-color: white; transform: translateX(-8px); opacity: 1 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        /* สไตล์ Pop-up รางวัลใหญ่ */
+        #prize-overlay { display: none; position: fixed; inset: 0; background: rgba(111, 78, 55, 0.4); backdrop-filter: blur(8px); z-index: 100; align-items: center; justify-content: center; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-6">
+
+    <div id="prize-overlay">
+        <div class="bg-white p-8 rounded-[2.5rem] border-4 border-[#6F4E37] shadow-2xl text-center max-w-sm mx-4 transform transition-all scale-110">
+            <h2 class="serif text-4xl italic text-[#6F4E37] mb-4">You Won! 🎉</h2>
+            <p id="prize-text" class="text-xl font-bold text-[#A67B5B] mb-2"></p>
+            <div class="bg-[#FDFBF7] p-4 rounded-2xl mb-6 border border-[#E7DCD3]">
+                <p class="text-xs text-[#8D6E63] uppercase tracking-widest mb-1">หลักฐานประจำวันที่</p>
+                <p id="current-date" class="font-bold text-[#6F4E37]"></p>
+            </div>
+            <p class="text-sm text-[#A67B5B] animate-pulse font-bold italic mb-6">"แคปหน้าจอนี้ไว้เพื่อรับรางวัลนะจ๊ะ!"</p>
+            <button onclick="closePrize()" class="bg-[#6F4E37] text-white px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037]">ไปเล่นต่อ</button>
+        </div>
+    </div>
+
+    <div class="fixed top-8 left-8 z-20">
+        <div class="bg-white px-6 py-3 rounded-2xl border border-[#E7DCD3] shadow-sm">
+            <p class="text-[10px] uppercase tracking-widest text-[#A67B5B] font-bold">Score</p>
+            <span id="score" class="text-3xl font-bold text-[#6F4E37]">0</span>
+        </div>
+    </div>
+
+    <div class="fixed right-6 top-1/2 -translate-y-1/2 z-20 w-52">
+        <h3 class="serif italic text-[#6F4E37] text-right mb-4 text-lg">Milestones</h3>
+        <div id="reward-1" class="reward-item bg-white/40 p-3 rounded-r-xl opacity-50">
+            <p class="text-[9px] font-bold text-[#A67B5B]">100 PTS</p>
+            <p class="text-xs text-[#6F4E37]">รักๆๆๆ</p>
+        </div>
+        <div id="reward-2" class="reward-item bg-white/40 p-3 rounded-r-xl opacity-50">
+            <p class="text-[9px] font-bold text-[#A67B5B]">50000 PTS</p>
+            <p class="text-xs text-[#6F4E37]">🥤 ชานมไข่มุก 1 แก้ว</p>
+        </div>
+        <div id="reward-3" class="reward-item bg-white/40 p-3 rounded-r-xl opacity-50">
+            <p class="text-[9px] font-bold text-[#A67B5B]">100000 PTS</p>
+            <p class="text-xs text-[#6F4E37]">ให้ 1 รอบ</p>
+        </div>
+    </div>
+
+    <div id="target">
+        <img id="targetImg" src="https://cdn-icons-png.flaticon.com/512/4140/4140037.png" 
+             class="w-full h-full rounded-full border-4 border-white shadow-2xl object-cover bg-white">
+    </div>
+
+    <div class="mb-10 z-20">
+        <a href="home.html" class="bg-[#6F4E37] text-white px-8 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md hover:bg-[#5D4037] transition-all">
+            ← Back to Gallery
+        </a>
+    </div>
+
+    <script>
+        const target = document.getElementById('target');
+        const scoreElement = document.getElementById('score');
+        const prizeOverlay = document.getElementById('prize-overlay');
+        let score = 0;
+
+        const rewards = [
+            { id: 'reward-1', points: 100, label: 'รักๆๆๆ' },
+            { id: 'reward-2', points: 1000, label: '🥤 ชานมไข่มุก 1 แก้ว' },
+            { id: 'reward-3', points: 5000, label: 'ให้ 1 รอบ' }
+        ];
+
+        function moveTarget() {
+            const maxX = window.innerWidth - target.clientWidth - 240;
+            const maxY = window.innerHeight - target.clientHeight - 200;
+            const randomX = Math.max(40, Math.floor(Math.random() * maxX));
+            const randomY = Math.max(140, Math.floor(Math.random() * maxY));
+            target.style.left = randomX + 'px';
+            target.style.top = randomY + 'px';
+        }
+
+        function heartExplosion() {
+            for(let i = 0; i < 30; i++) {
+                const heart = document.createElement('div');
+                heart.innerHTML = '❤️';
+                heart.className = 'reward-heart text-2xl';
+                heart.style.left = '50vw';
+                heart.style.top = '50vh';
+                const tx = (Math.random() - 0.5) * 800 + 'px';
+                const ty = (Math.random() - 0.5) * 800 + 'px';
+                heart.style.setProperty('--tx', tx);
+                heart.style.setProperty('--ty', ty);
+                document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 1500);
+            }
+        }
+
+        function showPrize(prizeLabel) {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('th-TH', { 
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+            document.getElementById('prize-text').innerText = prizeLabel;
+            document.getElementById('current-date').innerText = dateStr;
+            prizeOverlay.style.display = 'flex';
+        }
+
+        function closePrize() {
+            prizeOverlay.style.display = 'none';
+        }
+
+        function checkRewards() {
+            rewards.forEach(reward => {
+                const el = document.getElementById(reward.id);
+                if (score >= reward.points && !el.classList.contains('reward-unlocked')) {
+                    el.classList.add('reward-unlocked');
+                    el.innerHTML = '✅ ' + el.innerHTML;
+                    
+                    if(reward.id === 'reward-1') {
+                        heartExplosion();
+                    } else {
+                        // ถ้าเป็นรางวัลที่ 2 หรือ 3 ให้ขึ้นหน้าจอแคปหลักฐาน
+                        showPrize(reward.label);
+                    }
+                }
+            });
+        }
+
+        function handleHit(e) {
+            e.preventDefault();
+            score += 10;
+            scoreElement.innerText = score.toLocaleString();
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            createHeart(clientX, clientY);
+            checkRewards();
+            moveTarget();
+        }
+
+        target.addEventListener('mousedown', handleHit);
+        target.addEventListener('touchstart', handleHit);
+
+        function createHeart(x, y) {
+            const heart = document.createElement('div');
+            heart.innerHTML = '❤️';
+            heart.className = 'heart-particle text-3xl';
+            heart.style.left = (x - 20) + 'px';
+            heart.style.top = (y - 20) + 'px';
+            document.body.appendChild(heart);
+            setTimeout(() => heart.remove(), 800);
+        }
+
+        setInterval(moveTarget, 1400);
+        moveTarget();
+    </script>
+</body>
+</html>
